@@ -1,8 +1,0 @@
-{
-  "httpMethod": "POST",
-  "headers": {
-    "Content-Type": "application/json"
-  },
-  "body": "{\"type\": 1, \"genre\": 3, \"e1\": 111, \"b1\": 111, \"p1\": 10000, \"e2\": 222, \"b2\": 222, \"p2\": 20000, \"channel\": 1}"
-}
-

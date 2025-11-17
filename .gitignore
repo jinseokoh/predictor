@@ -1,19 +1,24 @@
-# Build artifacts
-*.zip
-layer/python/
-!layer/python/Model_LogitRegression.pkl
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist/
 build/
-
-# Virtual environments
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 venv/
 env/
 ENV/
@@ -27,7 +32,24 @@ ENV/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Logs
+# AWS
+response.json
+lambda-trust-policy.json
+lambda-execution-policy.json
+
+# Docker
+.dockerignore
+
+# 로그
 *.log
+
+# 임시 파일
+*.tmp
+*.temp

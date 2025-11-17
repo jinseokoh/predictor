@@ -11,7 +11,8 @@ import os
 
 # 전역 변수로 모델 캐싱 (Lambda cold start 최적화)
 _MODEL_CACHE = None
-_MODEL_PATH = "/opt/python/Model_LogitRegression.pkl"
+# Container Image에서는 LAMBDA_TASK_ROOT에 모델이 위치
+_MODEL_PATH = os.environ.get("MODEL_PATH", "/var/task/Model_LogitRegression.pkl")
 
 
 def load_model() -> Dict:

@@ -4,10 +4,15 @@ API Gateway와 통합되어 POST 요청을 받아 예측 결과를 반환
 """
 import json
 import traceback
+import logging
 from typing import Dict, Any
 
 from inference.preprocessing import validate_input, preprocess_input, align_columns_with_model
 from inference.predictor import load_model, predict
+
+# 로깅 설정
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def create_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,19 +43,25 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Lambda 진입점
     
     Args:
-        event: API Gateway에서 전달된 이벤트
+        event: API Gateway 또는 Function URL에서 전달된 이벤트
         context: Lambda context 객체
         
     Returns:
-        API Gateway 응답
+        API Gateway/Function URL 응답
     """
+    logger.info(f"Lambda invoked. Request ID: {context.aws_request_id if context else 'N/A'}")
+    logger.debug(f"Event: {json.dumps(event)}")
+    
     try:
+        # HTTP 메소드 추출 (API Gateway와 Function URL 모두 지원)
+        http_method = event.get('httpMethod') or event.get('requestContext', {}).get('http', {}).get('method')
+        
         # OPTIONS 요청 처리 (CORS preflight)
-        if event.get('httpMethod') == 'OPTIONS':
+        if http_method == 'OPTIONS':
             return create_response(200, {'message': 'OK'})
         
         # POST 요청인지 확인
-        if event.get('httpMethod') != 'POST':
+        if http_method != 'POST':
             return create_response(405, {
                 'error': 'Method not allowed',
                 'message': 'Only POST method is supported'
@@ -70,23 +81,31 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             data = body
         
         # 입력 유효성 검사
+        logger.info("Validating input data")
         validation_errors = validate_input(data)
         if validation_errors:
+            logger.warning(f"Validation failed: {validation_errors}")
             return create_response(400, {
                 'error': 'Validation failed',
                 'details': validation_errors
             })
         
         # 데이터 전처리
+        logger.info("Preprocessing input data")
         df = preprocess_input(data)
         
         # 모델 feature와 정렬
+        logger.info("Loading model")
         model_package = load_model()
         feature_names = model_package['feature_names']
+        logger.info(f"Model loaded. Features: {len(feature_names)}")
+        
         df = align_columns_with_model(df, feature_names)
         
         # 예측 수행
+        logger.info("Performing prediction")
         result, percentage = predict(df)
+        logger.info(f"Prediction result: {result}, percentage: {percentage}")
         
         # 성공 응답
         return create_response(200, {
@@ -95,16 +114,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         })
         
     except FileNotFoundError as e:
-        print(f"[ERROR] Model file not found: {str(e)}")
-        traceback.print_exc()
+        logger.error(f"Model file not found: {str(e)}", exc_info=True)
         return create_response(500, {
             'error': 'Model not found',
             'message': 'Prediction model is not available'
         })
         
     except Exception as e:
-        print(f"[ERROR] Unexpected error: {str(e)}")
-        traceback.print_exc()
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         return create_response(500, {
             'error': 'Internal server error',
             'message': str(e)

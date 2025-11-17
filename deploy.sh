@@ -1,57 +1,69 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 배포 스크립트
-# Layer와 Function을 순차적으로 빌드합니다
+FUNCTION_NAME="${FUNCTION_NAME:-predictor-api}"
+REGION="${REGION:-ap-northeast-2}"
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+REPO_NAME="${FUNCTION_NAME}"
+IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:latest"
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-cd "${SCRIPT_DIR}"
+echo "Building and deploying ${FUNCTION_NAME}..."
 
-echo "========================================="
-echo "  Lambda Predictor 배포 빌드"
-echo "========================================="
-echo ""
+# ECR login
+aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
-# Layer 빌드
-echo "1️⃣  Lambda Layer 빌드 중..."
-cd layer/
-./build.sh
-cd ..
+# Create ECR repo if needed
+aws ecr describe-repositories --repository-names ${REPO_NAME} --region ${REGION} >/dev/null 2>&1 || \
+  aws ecr create-repository --repository-name ${REPO_NAME} --region ${REGION} >/dev/null
+
+# Build and push
+docker build --platform linux/amd64 -t ${REPO_NAME}:latest .
+docker tag ${REPO_NAME}:latest ${IMAGE_URI}
+docker push ${IMAGE_URI} >/dev/null
+
+# Deploy Lambda
+if aws lambda get-function --function-name ${FUNCTION_NAME} --region ${REGION} >/dev/null 2>&1; then
+  aws lambda update-function-code \
+    --function-name ${FUNCTION_NAME} \
+    --image-uri ${IMAGE_URI} \
+    --region ${REGION} \
+    --output text >/dev/null
+  echo "✓ Function updated"
+else
+  ROLE_ARN=$(aws iam get-role --role-name lambda-execution-role --query 'Role.Arn' --output text)
+  aws lambda create-function \
+    --function-name ${FUNCTION_NAME} \
+    --package-type Image \
+    --code ImageUri=${IMAGE_URI} \
+    --role ${ROLE_ARN} \
+    --timeout 30 \
+    --memory-size 1024 \
+    --region ${REGION} \
+    --output text >/dev/null
+  echo "✓ Function created"
+fi
+
+# Create Function URL if needed
+if ! aws lambda get-function-url-config --function-name ${FUNCTION_NAME} --region ${REGION} >/dev/null 2>&1; then
+  aws lambda add-permission \
+    --function-name ${FUNCTION_NAME} \
+    --statement-id FunctionURLAllowPublicAccess \
+    --action lambda:InvokeFunctionUrl \
+    --principal "*" \
+    --function-url-auth-type NONE \
+    --region ${REGION} >/dev/null 2>&1 || true
+  
+  aws lambda create-function-url-config \
+    --function-name ${FUNCTION_NAME} \
+    --auth-type NONE \
+    --region ${REGION} \
+    --output text >/dev/null
+  echo "✓ Function URL created"
+fi
+
+FUNCTION_URL=$(aws lambda get-function-url-config --function-name ${FUNCTION_NAME} --region ${REGION} --query 'FunctionUrl' --output text)
 
 echo ""
-echo "2️⃣  Lambda Function 빌드 중..."
-cd function/
-./build.sh
-cd ..
-
-echo ""
-echo "========================================="
-echo "✅ 빌드 완료!"
-echo "========================================="
-echo ""
-echo "다음 파일들이 생성되었습니다:"
-echo "  📦 layer/predictor-layer.zip"
-echo "  📦 function/predictor-function.zip"
-echo ""
-echo "배포 방법:"
-echo "  1. Layer 배포:"
-echo "     aws lambda publish-layer-version \\"
-echo "       --layer-name predictor-dependencies \\"
-echo "       --zip-file fileb://layer/predictor-layer.zip \\"
-echo "       --compatible-runtimes python3.11"
-echo ""
-echo "  2. Function 배포 (신규):"
-echo "     aws lambda create-function \\"
-echo "       --function-name predictor-api \\"
-echo "       --runtime python3.11 \\"
-echo "       --role <YOUR_ROLE_ARN> \\"
-echo "       --handler handler.lambda_handler \\"
-echo "       --zip-file fileb://function/predictor-function.zip \\"
-echo "       --layers <LAYER_ARN>"
-echo ""
-echo "  3. Function 업데이트 (재배포):"
-echo "     aws lambda update-function-code \\"
-echo "       --function-name predictor-api \\"
-echo "       --zip-file fileb://function/predictor-function.zip"
-echo ""
+echo "Deployment complete!"
+echo "Function URL: ${FUNCTION_URL}"
 
