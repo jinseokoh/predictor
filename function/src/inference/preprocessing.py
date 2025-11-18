@@ -91,7 +91,7 @@ def standardize_features(df: pd.DataFrame, mean_std: Optional[Dict[str, Dict[str
     return df
 
 
-def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str, float]]] = None) -> pd.DataFrame:
+def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str, float]]] = None) -> tuple[pd.DataFrame, Dict[str, float]]:
     """
     입력 데이터를 모델이 사용할 수 있는 형태로 전처리
     
@@ -108,9 +108,10 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
           "p2": 20000,
           "channel": 1
         }
+        mean_std: 평균과 표준편차 딕셔너리
         
     Returns:
-        전처리된 DataFrame (모델 입력 형태)
+        (전처리된 DataFrame, 표준화된 지수 값 딕셔너리)
     """
     # 입력 데이터를 DataFrame으로 변환
     # 학습 시 사용한 컬럼명과 일치시킴
@@ -131,6 +132,16 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
     # 표준화 적용 (더미 변수 생성 전에 수행)
     df = standardize_features(df, mean_std)
     
+    # 표준화된 지수 값 추출
+    standardized_values = {
+        'e1': round(float(df['In_Engagement'].iloc[0]), 4),
+        'b1': round(float(df['In_History'].iloc[0]), 4),
+        'p1': round(float(df['In_Popularity'].iloc[0]), 4),
+        'e2': round(float(df['Ex_Engagement'].iloc[0]), 4),
+        'b2': round(float(df['Ex_History'].iloc[0]), 4),
+        'p2': round(float(df['Ex_Popularity'].iloc[0]), 4)
+    }
+    
     # 범주형 변수를 카테고리 타입으로 변환
     df['sale_channel'] = df['sale_channel'].astype('category')
     df['Type'] = df['Type'].astype('category')
@@ -149,7 +160,7 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
     # NaN 처리 (학습 시와 동일)
     df = df.fillna(0)
     
-    return df
+    return df, standardized_values
 
 
 def align_columns_with_model(df: pd.DataFrame, model_features: list) -> pd.DataFrame:

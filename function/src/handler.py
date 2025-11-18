@@ -9,6 +9,7 @@ from typing import Dict, Any
 
 from inference.preprocessing import validate_input, preprocess_input, align_columns_with_model
 from inference.predictor import load_model, predict
+from inference.load_mean_std import load_mean_std
 
 # 로깅 설정
 logger = logging.getLogger()
@@ -90,20 +91,23 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'details': validation_errors
             })
         
-        # 모델 로드 (표준화 통계값을 가져오기 위해 먼저 로드)
+        # 표준화 통계값 로드 (JSON 파일에서)
+        logger.info("Loading standardization statistics")
+        mean_std = load_mean_std()
+        if mean_std:
+            logger.info("Standardization statistics loaded from JSON config")
+        else:
+            logger.warning("No standardization statistics found. Standardization will be skipped.")
+        
+        # 모델 로드
         logger.info("Loading model")
         model_package = load_model()
         feature_names = model_package['feature_names']
-        mean_std = model_package.get('mean_std', None)  # 표준화 통계값 (선택적)
         logger.info(f"Model loaded. Features: {len(feature_names)}")
-        if mean_std:
-            logger.info("Standardization statistics found in model package")
-        else:
-            logger.warning("No standardization statistics found in model package. Standardization will be skipped.")
         
         # 데이터 전처리 (표준화 포함)
         logger.info("Preprocessing input data")
-        df = preprocess_input(data, mean_std)
+        df, standardized_values = preprocess_input(data, mean_std)
         
         # 모델 feature와 정렬
         df = align_columns_with_model(df, feature_names)
@@ -113,11 +117,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         result, percentage = predict(df)
         logger.info(f"Prediction result: {result}, percentage: {percentage}")
         
-        # 성공 응답
-        return create_response(200, {
+        # 성공 응답 (표준화된 지수 값 포함)
+        response_body = {
             'result': result,
             'percentage': round(percentage, 2)
-        })
+        }
+        
+        # 표준화된 6종 지수 값 추가
+        response_body.update(standardized_values)
+        
+        return create_response(200, response_body)
         
     except FileNotFoundError as e:
         logger.error(f"Model file not found: {str(e)}", exc_info=True)
