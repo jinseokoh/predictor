@@ -90,16 +90,22 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'details': validation_errors
             })
         
-        # 데이터 전처리
-        logger.info("Preprocessing input data")
-        df = preprocess_input(data)
-        
-        # 모델 feature와 정렬
+        # 모델 로드 (표준화 통계값을 가져오기 위해 먼저 로드)
         logger.info("Loading model")
         model_package = load_model()
         feature_names = model_package['feature_names']
+        mean_std = model_package.get('mean_std', None)  # 표준화 통계값 (선택적)
         logger.info(f"Model loaded. Features: {len(feature_names)}")
+        if mean_std:
+            logger.info("Standardization statistics found in model package")
+        else:
+            logger.warning("No standardization statistics found in model package. Standardization will be skipped.")
         
+        # 데이터 전처리 (표준화 포함)
+        logger.info("Preprocessing input data")
+        df = preprocess_input(data, mean_std)
+        
+        # 모델 feature와 정렬
         df = align_columns_with_model(df, feature_names)
         
         # 예측 수행

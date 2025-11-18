@@ -3,7 +3,7 @@
 POST 요청으로 받은 원본 데이터를 모델이 예측할 수 있는 형태로 변환
 """
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 def validate_input(data: Dict[str, Any]) -> Dict[str, str]:
@@ -45,7 +45,53 @@ def validate_input(data: Dict[str, Any]) -> Dict[str, str]:
     return errors
 
 
-def preprocess_input(data: Dict[str, Any]) -> pd.DataFrame:
+def standardize_features(df: pd.DataFrame, mean_std: Optional[Dict[str, Dict[str, float]]] = None) -> pd.DataFrame:
+    """
+    6개 지수 변수에 표준화 적용: (값 - 평균) / 표준편차
+    
+    Args:
+        df: 전처리 전 DataFrame (In_Engagement, In_History, In_Popularity, 
+            Ex_Engagement, Ex_History, Ex_Popularity 컬럼 포함)
+        mean_std: 평균과 표준편차 딕셔너리
+            {
+                'In_Engagement': {'mean': float, 'std': float},
+                'In_History': {'mean': float, 'std': float},
+                'In_Popularity': {'mean': float, 'std': float},
+                'Ex_Engagement': {'mean': float, 'std': float},
+                'Ex_History': {'mean': float, 'std': float},
+                'Ex_Popularity': {'mean': float, 'std': float}
+            }
+            None이면 표준화를 수행하지 않음 (기존 동작)
+    
+    Returns:
+        표준화된 DataFrame
+    """
+    if mean_std is None:
+        return df
+    
+    # 표준화가 필요한 컬럼들
+    columns_to_standardize = [
+        'In_Engagement', 'In_History', 'In_Popularity',
+        'Ex_Engagement', 'Ex_History', 'Ex_Popularity'
+    ]
+    
+    # 각 컬럼에 대해 표준화 적용
+    for col in columns_to_standardize:
+        if col in df.columns and col in mean_std:
+            mean = mean_std[col]['mean']
+            std = mean_std[col]['std']
+            
+            # 표준편차가 0이면 나누기 오류 방지
+            if std > 0:
+                df[col] = (df[col] - mean) / std
+            else:
+                # 표준편차가 0이면 평균으로 빼기만 수행
+                df[col] = df[col] - mean
+    
+    return df
+
+
+def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str, float]]] = None) -> pd.DataFrame:
     """
     입력 데이터를 모델이 사용할 수 있는 형태로 전처리
     
@@ -81,6 +127,9 @@ def preprocess_input(data: Dict[str, Any]) -> pd.DataFrame:
     }
     
     df = pd.DataFrame(input_dict)
+    
+    # 표준화 적용 (더미 변수 생성 전에 수행)
+    df = standardize_features(df, mean_std)
     
     # 범주형 변수를 카테고리 타입으로 변환
     df['sale_channel'] = df['sale_channel'].astype('category')

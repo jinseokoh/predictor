@@ -24,7 +24,16 @@ def load_model() -> Dict:
         {
             "model_type": "statsmodels_logit",
             "model": 학습된 모델 객체,
-            "feature_names": 학습에 사용된 feature 리스트
+            "feature_names": 학습에 사용된 feature 리스트,
+            "mean_std": 표준화를 위한 평균/표준편차 딕셔너리 (선택적)
+                {
+                    'In_Engagement': {'mean': float, 'std': float},
+                    'In_History': {'mean': float, 'std': float},
+                    'In_Popularity': {'mean': float, 'std': float},
+                    'Ex_Engagement': {'mean': float, 'std': float},
+                    'Ex_History': {'mean': float, 'std': float},
+                    'Ex_Popularity': {'mean': float, 'std': float}
+                }
         }
     """
     global _MODEL_CACHE
