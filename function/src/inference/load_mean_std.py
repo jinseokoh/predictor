@@ -7,15 +7,14 @@ from typing import Dict, Optional
 
 _MEAN_STD_CACHE = None
 
-# 하드코딩된 표준화 통계값 (DB에서 계산한 값으로 수정 필요)
-# 만약 이 값들을 채우면 JSON 파일 없이도 작동합니다
+# 하드코딩된 표준화 통계값 (모델 학습 시점의 통계)
 HARDCODED_MEAN_STD = {
-    # 'In_Engagement': {'mean': 0.0, 'std': 1.0},
-    # 'In_History': {'mean': 0.0, 'std': 1.0},
-    # 'In_Popularity': {'mean': 0.0, 'std': 1.0},
-    # 'Ex_Engagement': {'mean': 0.0, 'std': 1.0},
-    # 'Ex_History': {'mean': 0.0, 'std': 1.0},
-    # 'Ex_Popularity': {'mean': 0.0, 'std': 1.0}
+    'In_Engagement': {'mean': 41.82938, 'std': 65.669176},
+    'In_History': {'mean': 362.88374, 'std': 610.10993},
+    'In_Popularity': {'mean': 908.04684, 'std': 6431.8375},
+    'Ex_Engagement': {'mean': 109.32793, 'std': 120.94698},
+    'Ex_History': {'mean': 9.2596876, 'std': 9.9536345},
+    'Ex_Popularity': {'mean': 7775.3163, 'std': 9912.7047}
 }
 
 
