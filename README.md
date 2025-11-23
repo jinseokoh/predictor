@@ -4,12 +4,14 @@ Lambda Container Image 기반 머신러닝 예측 API
 
 ## 목표
 
-전달받은 로지스틱 회귀 기반 예측 모델을 기반으로 작가가치 예측 API 제작.
+전달받은 sklearn LogisticRegression 기반 예측 모델을 기반으로 작가가치 예측 API 제작.
   - 6개 지수는 DB record 값을 그대로 전달하여 API 에서 전처리(표준화) 후 사용
-  - 지수 e1, b1, p1, e2, b2, p2 (참여지수, 이력지수, 인기지수, 참여지수2, 이력지수2, 인기지수2)
+  - 지수 e1, b1, p1, e2, b2, p2 (내부참여지수, 내부이력지수, 내부인기지수, 외부참여지수, 외부이력지수, 외부인기지수)
   - 표준화 공식: (값 - 평균) / 표준편차
   - 표준화된 6개 지수 값을 응답에 포함하여 반환
-  - 변수 type, genre, channel (작가타입, 장르, 판매채널)
+  - 변수 type, genre (작가타입, 장르)
+    - type: 1=ARTIST1, 2=ARTIST2, 3=ARTIST3
+    - genre: 1=PAINTER, 2=DRAWER, 3=ETC, 4=GALLERY, 5=PHOTOGRAPHER, 6=SCULPTOR, 7=VISUAL_ARTIST
 
 ### 1. 배포된 Function URL:
 
@@ -28,8 +30,14 @@ Function URL: https://lbjf3q2ludatcmrthdkjeq72740mllta.lambda-url.ap-northeast-2
 ```bash
 curl -X POST https://lbjf3q2ludatcmrthdkjeq72740mllta.lambda-url.ap-northeast-2.on.aws/ \
   -H "Content-Type: application/json" \
-  -d '{"type":1,"genre":3,"e1":111,"b1":111,"p1":10000,"e2":222,"b2":222,"p2":20000,"channel":1}'
+  -d '{"type":1,"genre":3,"e1":144,"b1":1966,"p1":10000,"e2":422,"b2":32,"p2":20000}'
 ```
+
+**파라미터 설명:**
+- `type`: 작가타입 (1=ARTIST1, 2=ARTIST2, 3=ARTIST3)
+- `genre`: 장르 (1=PAINTER, 2=DRAWER, 3=ETC, 4=GALLERY, 5=PHOTOGRAPHER, 6=SCULPTOR, 7=VISUAL_ARTIST)
+- `e1`, `b1`, `p1`: 내부 참여지수, 이력지수, 인기지수
+- `e2`, `b2`, `p2`: 외부 참여지수, 이력지수, 인기지수
 
 응답 예시:
 

@@ -3,7 +3,6 @@
 모델을 로드하고 전처리된 데이터로 예측을 수행
 """
 import pickle
-import statsmodels.api as sm
 import pandas as pd
 from typing import Dict, Tuple
 import os
@@ -15,26 +14,12 @@ _MODEL_CACHE = None
 _MODEL_PATH = os.environ.get("MODEL_PATH", "/var/task/Model_LogitRegression.pkl")
 
 
-def load_model() -> Dict:
+def load_model():
     """
-    학습된 모델을 로드
+    학습된 sklearn LogisticRegression 모델을 로드
     
     Returns:
-        모델 패키지 딕셔너리
-        {
-            "model_type": "statsmodels_logit",
-            "model": 학습된 모델 객체,
-            "feature_names": 학습에 사용된 feature 리스트,
-            "mean_std": 표준화를 위한 평균/표준편차 딕셔너리 (선택적)
-                {
-                    'In_Engagement': {'mean': float, 'std': float},
-                    'In_History': {'mean': float, 'std': float},
-                    'In_Popularity': {'mean': float, 'std': float},
-                    'Ex_Engagement': {'mean': float, 'std': float},
-                    'Ex_History': {'mean': float, 'std': float},
-                    'Ex_Popularity': {'mean': float, 'std': float}
-                }
-        }
+        sklearn LogisticRegression 모델 객체
     """
     global _MODEL_CACHE
     
@@ -45,10 +30,10 @@ def load_model() -> Dict:
         raise FileNotFoundError(f"Model file not found: {_MODEL_PATH}")
     
     with open(_MODEL_PATH, "rb") as f:
-        model_package = pickle.load(f)
+        model = pickle.load(f)
     
-    _MODEL_CACHE = model_package
-    return model_package
+    _MODEL_CACHE = model
+    return model
 
 
 def predict(df: pd.DataFrame) -> Tuple[str, float]:
@@ -56,7 +41,9 @@ def predict(df: pd.DataFrame) -> Tuple[str, float]:
     전처리된 데이터로 예측 수행
     
     Args:
-        df: 전처리된 입력 DataFrame (상수항 없음)
+        df: 전처리된 입력 DataFrame
+            컬럼: Type, Genre, In_Engagement, In_History, In_Popularity,
+                  Ex_Engagement, Ex_History, Ex_Popularity
         
     Returns:
         (result, percentage) 튜플
@@ -64,24 +51,12 @@ def predict(df: pd.DataFrame) -> Tuple[str, float]:
         - percentage: 예측 확률 (0.0 ~ 100.0)
     """
     # 모델 로드
-    model_package = load_model()
-    model = model_package['model']
-    feature_names = model_package['feature_names']
+    model = load_model()
     
-    # 상수항 추가
-    df_with_const = sm.add_constant(df, has_constant='add')
-    
-    # 상수항이 먼저 오도록 컬럼 순서 조정
-    if 'const' in feature_names:
-        # feature_names와 동일한 순서로 컬럼 정렬
-        df_with_const = df_with_const[feature_names]
-    
-    # float 타입으로 변환
-    df_with_const = df_with_const.astype(float)
-    
-    # 예측 수행
-    # predict()는 class=1일 확률을 반환
-    prob = model.predict(df_with_const)[0]
+    # 예측 수행 (sklearn LogisticRegression)
+    # predict_proba()는 [class=0 확률, class=1 확률] 반환
+    prob_array = model.predict_proba(df)
+    prob = prob_array[0][1]  # class=1일 확률
     
     # 확률이 0.5 이상이면 "up" (potential_disc=1), 미만이면 "down" (potential_disc=0)
     result = "up" if prob >= 0.5 else "down"

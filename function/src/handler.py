@@ -101,16 +101,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # 모델 로드
         logger.info("Loading model")
-        model_package = load_model()
-        feature_names = model_package['feature_names']
-        logger.info(f"Model loaded. Features: {len(feature_names)}")
+        model = load_model()
+        logger.info("Model loaded successfully")
         
         # 데이터 전처리 (표준화 포함)
         logger.info("Preprocessing input data")
         df, standardized_values = preprocess_input(data, mean_std)
         
-        # 모델 feature와 정렬
-        df = align_columns_with_model(df, feature_names)
+        # 컬럼 정렬 (sklearn은 자동으로 처리하지만 호환성 유지)
+        df = align_columns_with_model(df)
         
         # 예측 수행
         logger.info("Performing prediction")
@@ -149,15 +148,14 @@ if __name__ == '__main__':
     test_event = {
         'httpMethod': 'POST',
         'body': json.dumps({
-            "type": 1,
-            "genre": 3,
-            "e1": 111,
-            "b1": 111,
-            "p1": 10000,
-            "e2": 222,
-            "b2": 222,  
-            "p2": 20000,
-            "channel": 1
+            "type": 1,         # 1=ARTIST1, 2=ARTIST2, 3=ARTIST3
+            "genre": 3,        # 1=PAINTER, 2=DRAWER, 3=ETC, 4=GALLERY, 5=PHOTOGRAPHER, 6=SCULPTOR, 7=VISUAL_ARTIST
+            "e1": 111,         # In_Engagement
+            "b1": 111,         # In_History
+            "p1": 10000,       # In_Popularity
+            "e2": 222,         # Ex_Engagement
+            "b2": 222,         # Ex_History
+            "p2": 20000        # Ex_Popularity
         })
     }
     

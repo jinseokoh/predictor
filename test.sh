@@ -5,7 +5,7 @@ FUNCTION_NAME="${FUNCTION_NAME:-predictor-api}"
 REGION="${REGION:-ap-northeast-2}"
 
 # Test payload
-PAYLOAD='{"type":1,"genre":3,"e1":111,"b1":111,"p1":10000,"e2":222,"b2":222,"p2":20000,"channel":1}'
+PAYLOAD='{"type":1,"genre":3,"e1":111,"b1":111,"p1":10000,"e2":222,"b2":222,"p2":20000}'
 
 # Get Function URL
 FUNCTION_URL=$(aws lambda get-function-url-config \

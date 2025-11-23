@@ -18,7 +18,7 @@ def validate_input(data: Dict[str, Any]) -> Dict[str, str]:
     """
     errors = {}
     
-    required_fields = ['type', 'genre', 'e1', 'b1', 'p1', 'e2', 'b2', 'p2', 'channel']
+    required_fields = ['type', 'genre', 'e1', 'b1', 'p1', 'e2', 'b2', 'p2']
     
     for field in required_fields:
         if field not in data:
@@ -31,7 +31,14 @@ def validate_input(data: Dict[str, Any]) -> Dict[str, str]:
     try:
         type_val = int(data['type'])
         genre_val = int(data['genre'])
-        channel_val = int(data['channel'])
+        
+        # Type 범위 검증: 1(ARTIST1), 2(ARTIST2), 3(ARTIST3)
+        if type_val not in [1, 2, 3]:
+            errors['type'] = "type must be 1, 2, or 3"
+        
+        # Genre 범위 검증: 1~7
+        if genre_val not in [1, 2, 3, 4, 5, 6, 7]:
+            errors['genre'] = "genre must be between 1 and 7"
         
         # 숫자형 필드 검증
         for field in ['e1', 'b1', 'p1', 'e2', 'b2', 'p2']:
@@ -98,15 +105,14 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
     Args:
         data: POST 요청 데이터
         {
-          "type": 1,
-          "genre": 3,
-          "e1": 111,
-          "b1": 111,
-          "p1": 10000,
-          "e2": 222,
-          "b2": 222,  
-          "p2": 20000,
-          "channel": 1
+          "type": 1,        # 1=ARTIST1, 2=ARTIST2, 3=ARTIST3
+          "genre": 3,       # 1=PAINTER, 2=DRAWER, 3=ETC, 4=GALLERY, 5=PHOTOGRAPHER, 6=SCULPTOR, 7=VISUAL_ARTIST
+          "e1": 111,        # In_Engagement
+          "b1": 111,        # In_History
+          "p1": 10000,      # In_Popularity
+          "e2": 222,        # Ex_Engagement
+          "b2": 222,        # Ex_History
+          "p2": 20000       # Ex_Popularity
         }
         mean_std: 평균과 표준편차 딕셔너리
         
@@ -114,7 +120,7 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
         (전처리된 DataFrame, 표준화된 지수 값 딕셔너리)
     """
     # 입력 데이터를 DataFrame으로 변환
-    # 학습 시 사용한 컬럼명과 일치시킴
+    # 노트북과 동일한 컬럼명 사용
     input_dict = {
         'Type': [int(data['type'])],
         'Genre': [int(data['genre'])],
@@ -123,13 +129,12 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
         'In_Popularity': [float(data['p1'])],
         'Ex_Engagement': [float(data['e2'])],
         'Ex_History': [float(data['b2'])],
-        'Ex_Popularity': [float(data['p2'])],
-        'sale_channel': [int(data['channel'])]
+        'Ex_Popularity': [float(data['p2'])]
     }
     
     df = pd.DataFrame(input_dict)
     
-    # 표준화 적용 (더미 변수 생성 전에 수행)
+    # 표준화 적용
     df = standardize_features(df, mean_std)
     
     # 표준화된 지수 값 추출
@@ -142,52 +147,24 @@ def preprocess_input(data: Dict[str, Any], mean_std: Optional[Dict[str, Dict[str
         'p2': round(float(df['Ex_Popularity'].iloc[0]), 4)
     }
     
-    # 범주형 변수를 카테고리 타입으로 변환
-    df['sale_channel'] = df['sale_channel'].astype('category')
-    df['Type'] = df['Type'].astype('category')
-    df['Genre'] = df['Genre'].astype('category')
-    
-    # 더미 변수 생성 (drop_first=True - 학습 시와 동일)
-    df = pd.get_dummies(
-        df,
-        columns=['Type', 'Genre', 'sale_channel'],
-        drop_first=True
-    )
-    
-    # 숫자형으로 변환
-    df = df.apply(pd.to_numeric, errors='coerce')
-    
-    # NaN 처리 (학습 시와 동일)
+    # NaN 처리
     df = df.fillna(0)
     
     return df, standardized_values
 
 
-def align_columns_with_model(df: pd.DataFrame, model_features: list) -> pd.DataFrame:
+def align_columns_with_model(df: pd.DataFrame, model_features: list = None) -> pd.DataFrame:
     """
-    입력 DataFrame의 컬럼을 모델 학습 시 사용한 feature와 정렬
-    학습 시 없던 더미 변수는 0으로, 학습 시 있던 변수가 없으면 0으로 추가
+    입력 DataFrame 반환 (sklearn 모델은 컬럼 순서 자동 처리)
     
     Args:
         df: 전처리된 입력 DataFrame
-        model_features: 모델 학습 시 사용한 feature 리스트
+        model_features: 사용하지 않음 (호환성 유지용)
         
     Returns:
-        모델 feature와 정렬된 DataFrame
+        입력 DataFrame (변경 없음)
     """
-    # 상수항(const) 제외한 feature들
-    features_without_const = [f for f in model_features if f != 'const']
-    
-    # 모델에 있지만 입력에 없는 컬럼은 0으로 추가
-    for feature in features_without_const:
-        if feature not in df.columns:
-            df[feature] = 0
-    
-    # 입력에 있지만 모델에 없는 컬럼은 제거
-    df = df[features_without_const]
-    
-    # 컬럼 순서를 모델과 일치시킴
-    df = df[features_without_const]
-    
+    # sklearn LogisticRegression은 학습 시 컬럼 순서를 기억하므로
+    # 별도의 정렬이 필요 없음
     return df
 
